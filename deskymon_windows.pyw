@@ -24,14 +24,25 @@ RUN_DIST     = 55
 SPEECH_CHANCE = 0.003
 
 QUIPS = {
-    "pikachu":    ["Pika!", "Pikachu!", "Pika pika~", "*zap*"],
-    "eevee":      ["Eevee!", "Vee~", "*curious stare*", "Eeev?"],
-    "psyduck":    ["Psy...", "Ow my head", "Psy-yi-yi!", "...?"],
-    "gengar":     ["Gengar!", "*cackle*", "Heh heh heh"],
-    "snorlax":    ["Zzzz...", "*snore*", "Snorlax!"],
-    "bulbasaur":  ["Bulba!", "Saur~", "*sniff*"],
-    "charmander": ["Char!", "Charmander!", "*tail flicker*"],
-    "mewtwo":     ["...", "*stare*", "Mew."],
+    "pikachu":    ["Pika!", "Pika pika!", "Pikachu!", "Pikaa~", "Pika pi!"],
+    "eevee":      ["Eevee!", "Vui!", "Eevee vui!", "Eev!", "Vuiii~"],
+    "psyduck":    ["Psy?", "Psyduck!", "Psy psy!", "Psyyy...", "Psy-yi-yi!"],
+    "gengar":     ["Gengar!", "Geng!", "Gengarrr~", "Geng geng!"],
+    "snorlax":    ["Snorlax!", "Snor...", "Lax!", "Snoooor~"],
+    "bulbasaur":  ["Bulba!", "Bulbasaur!", "Bulba bulba!", "Saur!"],
+    "charmander": ["Char!", "Charmander!", "Char char!", "Charrr~"],
+    "mewtwo":     ["Mew.", "Mewtwo!", "...Mew.", "Mewww~", "Mew mew."],
+}
+
+POKE_REACTIONS = {
+    "pikachu":    ["Pika pi!", "Pikachuuu!", "Pika!"],
+    "eevee":      ["Vui vui!", "Eevee!", "Eev!"],
+    "psyduck":    ["PSY!", "Psyduck!", "Psy psy!"],
+    "gengar":     ["GENGAR!", "Geng!!", "Gengarrr!"],
+    "snorlax":    ["SNORLAX!", "Snor!!", "LAX!"],
+    "bulbasaur":  ["BULBA!", "Saur!!", "Bulbasaur!"],
+    "charmander": ["CHAR!", "Charrr!!", "Charmander!"],
+    "mewtwo":     ["MEW.", "...!", "Mewtwo!!"],
 }
 
 # ── Win32 helpers for click-through + always-on-top ─────────────────────────
@@ -165,7 +176,7 @@ class DeskyMon:
         r.mainloop()
 
     def _poke(self):
-        self.speech  = random.choice(["Ow!", "Hey~", "Eep!", "!"])
+        self.speech   = random.choice(POKE_REACTIONS.get(self.name, ["!"]))
         self.speech_t = 60
 
     def _poll_cursor(self):
@@ -174,13 +185,18 @@ class DeskyMon:
         return pt.x, pt.y
 
     def _preferred_zone(self, mx, my):
-        """Return the quadrant opposite to where the cursor is — least distracting."""
-        cx = self.SW / 2
-        cy = self.SH / 2
-        # target x: opposite horizontal half, 80px from edge
-        tx = self.SW - 120 if mx < cx else 120
-        # target y: bottom third of screen — out of the way
-        ty = self.SH - 160
+        """Hug bottom edge, opposite side from cursor. Hysteresis prevents jitter."""
+        margin = 100
+        # Only switch sides if cursor is clearly past center by a margin
+        if not hasattr(self, "_side"):
+            self._side = "right"   # default: bottom-right
+        if mx < self.SW * 0.4:
+            self._side = "right"
+        elif mx > self.SW * 0.6:
+            self._side = "left"
+        tx = self.SW - margin if self._side == "right" else margin
+        # Stay in bottom 15% of screen — well out of the way
+        ty = self.SH - self.sh - 80
         return tx, ty
 
     def _loop(self):
