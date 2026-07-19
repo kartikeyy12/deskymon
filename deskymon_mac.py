@@ -105,6 +105,9 @@ class DeskyMon:
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
         r.configure(bg=BGCOL)
+        # Tell the Mac compositor to key out this exact color
+        r.update()
+        r.tk.call("wm", "attributes", r._w, "-transparentcolor", BGCOL)
         r.resizable(False, False)
 
         # Hide title bar — works on macOS without overrideredirect
