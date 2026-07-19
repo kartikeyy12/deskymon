@@ -293,6 +293,7 @@ class DeskyMon:
         self.img_r = ImageTk.PhotoImage(self.sprite_img)
         self.img_l = ImageTk.PhotoImage(
             self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
+        self._images = [self.img_r, self.img_l]
         self.speech   = f"Hi! I'm {name.capitalize()}!"
         self.speech_t = 100
 
