@@ -19,7 +19,7 @@ FOLLOW_DIST   = 160
 RUN_DIST      = 50
 DEADZONE      = 30
 SPEECH_CHANCE = 0.003
-CHROMA        = "#00fe00"   # green chroma key — made transparent by the window
+CHROMA        = "#00fe00"   # green chroma key — keyed out by transparentcolor
 
 QUIPS = {
     "pikachu":    ["Pika!", "Pika pika!", "Pikachu!", "Pikaa~"],
@@ -99,20 +99,15 @@ class DeskyMon:
         self.SW = r.winfo_screenwidth()
         self.SH = r.winfo_screenheight()
 
-        # No overrideredirect — breaks on Apple Silicon
-        # Instead: transparent + topmost, title bar hidden via attributes
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
         r.wm_attributes("-alpha", 0.999)
         r.configure(bg=CHROMA)
         r.resizable(False, False)
 
-        # Hide title bar on Mac without overrideredirect
-        try:
-            r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w,
-                      "plain", "none")
-        except Exception:
-            pass
+        # Hide title bar — works on macOS without overrideredirect
+        r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w, "plain", "none")
+        r.overrideredirect(True)
 
         self.sprite_img = fetch_sprite(name)
         self.sw, self.sh = self.sprite_img.size
