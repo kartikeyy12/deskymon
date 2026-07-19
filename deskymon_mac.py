@@ -56,10 +56,8 @@ def fetch_sprite(name):
 
 
 def composite(sprite_img):
-    """Composite RGBA sprite onto chroma-green background → RGB image."""
-    bg = Image.new("RGBA", sprite_img.size, (0, 254, 0, 255))
-    bg.paste(sprite_img, mask=sprite_img.split()[3])
-    return bg.convert("RGB")
+    """Return sprite as-is — Mac transparent window handles alpha natively."""
+    return sprite_img
 
 
 def run_picker():
@@ -101,9 +99,7 @@ class DeskyMon:
 
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.wm_attributes("-alpha", 0.999)
-        r.wm_attributes("-transparentcolor", CHROMA)
-        r.configure(bg=CHROMA)
+        r.configure(bg="systemTransparent")
         r.resizable(False, False)
 
         # Hide title bar — works on macOS without overrideredirect
@@ -118,7 +114,7 @@ class DeskyMon:
         self.WIN_H = self.sh + 36
 
         # Single label — composite sprite onto chroma bg, window keys it out
-        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg=CHROMA)
+        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg="systemTransparent")
         self.lbl.pack(pady=(26, 0), padx=10, anchor="w")
 
         # Speech bubble
