@@ -19,6 +19,7 @@ FOLLOW_DIST   = 160
 RUN_DIST      = 50
 DEADZONE      = 30
 SPEECH_CHANCE = 0.003
+CHROMA        = "#00fe00"   # green chroma key — made transparent by the window
 
 QUIPS = {
     "pikachu":    ["Pika!", "Pika pika!", "Pikachu!", "Pikaa~"],
@@ -51,10 +52,14 @@ def fetch_sprite(name):
         open(path, "wb").write(raw)
     img = Image.open(path).convert("RGBA")
     w, h = img.size
-    img = img.resize((w * SPRITE_SCALE, h * SPRITE_SCALE), Image.NEAREST)
-    r, g, b, a = img.split()
-    a = a.point(lambda x: 0 if x < 128 else 255)
-    return Image.merge("RGBA", (r, g, b, a))
+    return img.resize((w * SPRITE_SCALE, h * SPRITE_SCALE), Image.NEAREST)
+
+
+def composite(sprite_img):
+    """Composite RGBA sprite onto chroma-green background → RGB image."""
+    bg = Image.new("RGBA", sprite_img.size, (0, 254, 0, 255))
+    bg.paste(sprite_img, mask=sprite_img.split()[3])
+    return bg.convert("RGB")
 
 
 def run_picker():
@@ -67,15 +72,14 @@ def run_picker():
     root.attributes("-topmost", True)
 
     tk.Label(root, text="deskymon", font=("Helvetica", 16, "bold"), bg="#f5f5f5").pack(pady=(20,4))
-    tk.Label(root, text="Pick your desktop buddy", font=("Helvetica", 10), fg="#666", bg="#f5f5f5").pack(pady=(0,14))
+    tk.Label(root, text="Pick your desktop buddy", font=("Helvetica",10), fg="#666", bg="#f5f5f5").pack(pady=(0,14))
 
     chosen = tk.StringVar()
     f = tk.Frame(root, bg="#f5f5f5")
     f.pack(padx=24, pady=(0,20))
 
     def pick(n):
-        chosen.set(n)
-        root.destroy()
+        chosen.set(n); root.destroy()
 
     for i, n in enumerate(POKEMON_LIST):
         tk.Button(f, text=n.capitalize(), width=11, command=lambda n=n: pick(n),
@@ -95,38 +99,34 @@ class DeskyMon:
         self.SW = r.winfo_screenwidth()
         self.SH = r.winfo_screenheight()
 
-        # Mac transparent window
-        r.overrideredirect(True)
+        # No overrideredirect — breaks on Apple Silicon
+        # Instead: transparent + topmost, title bar hidden via attributes
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.configure(bg="systemTransparent")
+        r.wm_attributes("-alpha", 0.999)
+        r.configure(bg=CHROMA)
+        r.resizable(False, False)
+
+        # Hide title bar on Mac without overrideredirect
+        try:
+            r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w,
+                      "plain", "none")
+        except Exception:
+            pass
 
         self.sprite_img = fetch_sprite(name)
         self.sw, self.sh = self.sprite_img.size
         self.WIN_W = self.sw + 20
         self.WIN_H = self.sh + 36
 
-        # ── KEY FIX: use a Frame + Label, NOT a Canvas ──
-        # Canvas.create_image doesn't render on transparent windows on macOS.
-        # A Label with image= works correctly.
-        self.frame = tk.Frame(r, bg="systemTransparent", 
-                              width=self.WIN_W, height=self.WIN_H)
-        self.frame.pack_propagate(False)
-        self.frame.pack()
+        # Single label — composite sprite onto chroma bg, window keys it out
+        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg=CHROMA)
+        self.lbl.pack(pady=(26, 0), padx=10, anchor="w")
 
-        # Speech bubble label (text, hidden when empty)
-        self.bubble_var = tk.StringVar()
-        self.bubble_lbl = tk.Label(self.frame, textvariable=self.bubble_var,
-                                   font=("Helvetica", 9), fg="#222",
-                                   bg="white", relief="solid", bd=1,
-                                   padx=4, pady=2)
+        # Speech bubble
+        self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222",
+                               bg="white", relief="solid", bd=1, padx=4, pady=2)
 
-        # Sprite label — this is what actually shows the Pokémon
-        self.sprite_lbl = tk.Label(self.frame, bg="systemTransparent",
-                                   highlightthickness=0, bd=0)
-        self.sprite_lbl.place(x=10, y=26)
-
-        # State
         self.x  = float(self.SW - self.sw - 80)
         self.y  = float(self.SH - self.sh - 80)
         self.vx = self.vy = 0.0
@@ -142,14 +142,13 @@ class DeskyMon:
 
         self._load_images()
 
-        # Right-click / Ctrl+click menu
         menu = tk.Menu(r, tearoff=0)
         menu.add_command(label="Switch Pokémon", command=self.open_picker)
         menu.add_separator()
         menu.add_command(label="Quit", command=r.destroy)
-        self.sprite_lbl.bind("<Button-2>",         lambda e: menu.tk_popup(e.x_root, e.y_root))
-        self.sprite_lbl.bind("<Control-Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
-        self.sprite_lbl.bind("<Button-1>",         lambda e: self._poke())
+        self.lbl.bind("<Button-2>",         lambda e: menu.tk_popup(e.x_root, e.y_root))
+        self.lbl.bind("<Control-Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+        self.lbl.bind("<Button-1>",         lambda e: self._poke())
 
         r.wm_geometry(f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
         self._poll_cursor()
@@ -157,13 +156,12 @@ class DeskyMon:
         r.mainloop()
 
     def _load_images(self):
-        img_r = self.sprite_img
-        img_l = self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT)
+        img_r = composite(self.sprite_img)
+        img_l = composite(self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
         self.img_r = ImageTk.PhotoImage(img_r)
         self.img_l = ImageTk.PhotoImage(img_l)
-        # Store on the label itself — safest way to keep Mac from GC'ing them
-        self.sprite_lbl.img_r = self.img_r
-        self.sprite_lbl.img_l = self.img_l
+        self.lbl.img_r = self.img_r
+        self.lbl.img_l = self.img_l
 
     def _poll_cursor(self):
         try:
@@ -214,8 +212,10 @@ class DeskyMon:
                 if self.idle_ticks > 120:
                     self.idle_ticks = 0
                     self.idle_dir = random.choice([-1, 0, 0, 1])
-                self.vx += self.idle_dir * 0.15 if self.idle_ticks < 50 else 0
-                self.vx *= 0.80
+                if self.idle_ticks < 50 and self.idle_dir:
+                    self.vx += self.idle_dir * 0.15
+                else:
+                    self.vx *= 0.80
                 self.vy *= 0.80
 
         friction = 0.75 if dist > FOLLOW_DIST else 0.84
@@ -239,19 +239,16 @@ class DeskyMon:
         self.root.after(16, self._loop)
 
     def _draw(self):
-        # Update sprite image
         img = self.img_r if self.facing >= 0 else self.img_l
-        self.sprite_lbl.configure(image=img)
+        self.lbl.configure(image=img)
 
-        # Speech bubble
         if self.speech_t > 0:
-            self.bubble_var.set(self.speech)
-            self.bubble_lbl.place(x=10, y=2)
+            self.bubble.configure(text=self.speech)
+            self.bubble.place(x=10, y=4)
             self.speech_t -= 1
         else:
-            self.bubble_lbl.place_forget()
+            self.bubble.place_forget()
 
-        # Move window
         self.root.wm_geometry(
             f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
 
@@ -260,15 +257,13 @@ class DeskyMon:
         picker.title("Switch Pokémon")
         picker.configure(bg="#f5f5f5")
         picker.resizable(False, False)
-        picker.lift()
-        picker.focus_force()
+        picker.lift(); picker.focus_force()
         tk.Label(picker, text="Who's your buddy?",
                  font=("Helvetica", 13, "bold"), bg="#f5f5f5").pack(pady=(16,8))
         f = tk.Frame(picker, bg="#f5f5f5")
         f.pack(padx=20, pady=(0,16))
         def pick(n):
-            picker.destroy()
-            self.switch(n)
+            picker.destroy(); self.switch(n)
         for i, n in enumerate(POKEMON_LIST):
             tk.Button(f, text=n.capitalize(), width=10,
                 command=lambda n=n: pick(n),
