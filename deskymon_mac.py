@@ -128,6 +128,12 @@ class DeskyMon:
             highlightthickness=0)
         self.canvas.pack()
 
+        # Mac: use a Label on top of canvas for sprite — canvas.create_image
+        # doesn't render on transparent canvas on macOS
+        self.sprite_label = tk.Label(r, bg="systemTransparent",
+                                     highlightthickness=0, bd=0)
+        self.sprite_label.place(x=10, y=26)
+
         self.x = float(self.SW - self.sw - 80)
         self.y = float(self.SH - self.sh - 80)
         self.vx = self.vy = 0.0
@@ -259,8 +265,10 @@ class DeskyMon:
                 text=self.speech, font=("Helvetica", 9), fill="#222")
             self.speech_t -= 1
 
+        # Use Label for sprite — more reliable than create_image on Mac
         img = self.img_r if self.facing >= 0 else self.img_l
-        c.create_image(10, 26, anchor="nw", image=img)
+        self.sprite_label.configure(image=img)
+        self.sprite_label.image = img  # extra keep-alive
 
         self.root.wm_geometry(
             f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
@@ -294,6 +302,7 @@ class DeskyMon:
         self.img_l = ImageTk.PhotoImage(
             self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
         self._images = [self.img_r, self.img_l]
+        self.sprite_label.place(x=10, y=26)
         self.speech   = f"Hi! I'm {name.capitalize()}!"
         self.speech_t = 100
 
