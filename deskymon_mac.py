@@ -106,8 +106,10 @@ class DeskyMon:
         r.resizable(False, False)
 
         # Hide title bar — works on macOS without overrideredirect
-        r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w, "plain", "none")
-        r.overrideredirect(True)
+        try:
+            r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w, "plain", "none")
+        except Exception:
+            pass
 
         self.sprite_img = fetch_sprite(name)
         self.sw, self.sh = self.sprite_img.size
