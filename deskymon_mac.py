@@ -56,8 +56,12 @@ def fetch_sprite(name):
 
 
 def composite(sprite_img):
-    """Return sprite as-is — Mac transparent window handles alpha natively."""
-    return sprite_img
+    """Composite onto a unique bg color that will be keyed out by the window."""
+    # Use a very specific purple that won't appear in any Pokemon sprite
+    KEY = (254, 0, 254, 255)
+    bg = Image.new("RGBA", sprite_img.size, KEY)
+    bg.paste(sprite_img, mask=sprite_img.split()[3])
+    return bg.convert("RGB")
 
 
 def run_picker():
@@ -97,9 +101,10 @@ class DeskyMon:
         self.SW = r.winfo_screenwidth()
         self.SH = r.winfo_screenheight()
 
+        BGCOL = "#fe00fe"  # magic purple — keyed transparent
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.configure(bg="systemTransparent")
+        r.configure(bg=BGCOL)
         r.resizable(False, False)
 
         # Hide title bar — works on macOS without overrideredirect
@@ -114,7 +119,7 @@ class DeskyMon:
         self.WIN_H = self.sh + 36
 
         # Single label — composite sprite onto chroma bg, window keys it out
-        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg="systemTransparent")
+        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg="#fe00fe")
         self.lbl.pack(pady=(26, 0), padx=10, anchor="w")
 
         # Speech bubble
