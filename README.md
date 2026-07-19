@@ -5,7 +5,15 @@ A tiny pixel-art Pokémon that lives on your desktop — follows your cursor, ru
 Sprites are auto-downloaded from PokéAPI on first run. No manual setup needed.
  
 ---
- 
+
+## Download
+
+**Windows** → [deskymon.exe](https://github.com/kartikeyy12/deskymon/releases/latest/download/deskymon.exe) — no Python needed, just double-click.
+
+**Mac** → see installation instructions below.
+
+---
+
 ## Pokémon available
  
 Pikachu · Eevee · Psyduck · Gengar · Snorlax · Bulbasaur · Charmander · Mewtwo
