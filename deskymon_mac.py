@@ -102,6 +102,7 @@ class DeskyMon:
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
         r.wm_attributes("-alpha", 0.999)
+        r.wm_attributes("-transparentcolor", CHROMA)
         r.configure(bg=CHROMA)
         r.resizable(False, False)
 
