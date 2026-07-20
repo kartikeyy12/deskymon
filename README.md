@@ -10,7 +10,7 @@ Sprites are auto-downloaded from PokéAPI on first run. No manual setup needed.
 
 **Windows** → [deskymon.exe](https://github.com/kartikeyy12/deskymon/releases/latest/download/deskymon.exe) — no Python needed, just double-click.
 
-**Mac** → see installation instructions below.
+**Mac** → [deskymon_mac.zip](https://github.com/kartikeyy12/deskymon/releases/latest/download/deskymon_mac.zip) — extract and double-click `deskymon.app`. *(small dark window — full transparency coming soon)*
 
 ---
 
