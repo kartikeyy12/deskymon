@@ -141,8 +141,9 @@ class DeskyMon:
         self.WIN_W = self.sw + 20
         self.WIN_H = self.sh + 36
 
-        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg='systemTransparent')
-        self.lbl.place(x=10, y=28)
+        self.canvas = tk.Canvas(r, width=self.WIN_W, height=self.WIN_H,
+                                bg="systemTransparent", highlightthickness=0)
+        self.canvas.place(x=0, y=0)
 
         self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
                                bg="white", relief="solid", bd=1,
@@ -173,9 +174,9 @@ class DeskyMon:
         menu.add_command(label="Switch Pokemon", command=self.open_picker)
         menu.add_separator()
         menu.add_command(label="Quit", command=r.destroy)
-        self.lbl.bind("<Button-2>",         lambda e: menu.tk_popup(e.x_root, e.y_root))
-        self.lbl.bind("<Control-Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
-        self.lbl.bind("<Button-1>",         lambda e: self._poke())
+        self.canvas.bind("<Button-2>",         lambda e: menu.tk_popup(e.x_root, e.y_root))
+        self.canvas.bind("<Control-Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+        self.canvas.bind("<Button-1>",         lambda e: self._poke())
 
         self._poll_cursor()
         self._loop()
@@ -185,8 +186,8 @@ class DeskyMon:
         self.img_r = ImageTk.PhotoImage(self.sprite_img)
         self.img_l = ImageTk.PhotoImage(
             self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
-        self.lbl.img_r = self.img_r
-        self.lbl.img_l = self.img_l
+        self.canvas.img_r = self.img_r
+        self.canvas.img_l = self.img_l
 
     def _poll_cursor(self):
         try:
@@ -264,8 +265,9 @@ class DeskyMon:
         self.root.after(16, self._loop)
 
     def _draw(self):
+        self.canvas.delete("sprite")
         img = self.img_r if self.facing >= 0 else self.img_l
-        self.lbl.configure(image=img)
+        self.canvas.create_image(10, 28, anchor="nw", image=img, tags="sprite")
 
         if self.speech_t > 0:
             self.bubble.configure(text=self.speech)
