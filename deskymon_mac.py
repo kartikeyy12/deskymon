@@ -73,12 +73,15 @@ def make_transparent(tk_window):
         win.setBackgroundColor_(NSColor.clearColor())
         win.setOpaque_(False)
         win.setHasShadow_(False)
-        # Key out our magic pink color using NSColor colorWithDeviceRed
-        # This is the Cocoa equivalent of -transparentcolor
-        pink = NSColor.colorWithDeviceRed_green_blue_alpha_(
-            254/255.0, 0/255.0, 254/255.0, 1.0)
-        win.setColorKey_(pink)
-        print(f"Applied transparency + colorKey to window {win.windowNumber()}")
+        # Make content view layer-backed and fully transparent
+        content_view = win.contentView()
+        content_view.setWantsLayer_(True)
+        content_view.layer().setOpacity_(1.0)
+        # Set the window background to a CGColor with 0 alpha
+        from AppKit import NSColor
+        win.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(
+            254/255.0, 0/255.0, 254/255.0, 0.0))
+        print(f"Applied transparency to window {win.windowNumber()}")
         return True
     except Exception as e:
         print(f"PyObjC error: {e}")
