@@ -141,7 +141,7 @@ class DeskyMon:
         self.WIN_W = self.sw + 20
         self.WIN_H = self.sh + 36
 
-        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg=self.BG)
+        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg='systemTransparent')
         self.lbl.place(x=10, y=28)
 
         self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
