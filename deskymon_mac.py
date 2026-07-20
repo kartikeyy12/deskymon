@@ -52,36 +52,30 @@ def fetch_sprite(name):
     img = Image.open(path).convert("RGBA")
     w, h = img.size
     img = img.resize((w * SPRITE_SCALE, h * SPRITE_SCALE), Image.NEAREST)
-    # Clean up semi-transparent edge pixels
     r, g, b, a = img.split()
     a = a.point(lambda x: 0 if x < 128 else 255)
     return Image.merge("RGBA", (r, g, b, a))
 
 
-def make_ns_window_transparent(tk_window):
-    """Use PyObjC to make the underlying NSWindow fully transparent."""
+def make_transparent(tk_window):
+    """Make NSWindow transparent using safe PyObjC API."""
     try:
-        from AppKit import NSApp, NSColor
-        from Foundation import NSObject
-        import objc
-
-        # Force the window to render so we can get its handle
+        from AppKit import NSApplication, NSColor, NSWindow
         tk_window.update()
-
-        # Get NSWindow from the tkinter window ID
-        win_id = tk_window.winfo_id()
-        ns_view = objc.objc_object(c_void_p=win_id)
-        ns_window = ns_view.window()
-
-        # Make fully transparent
-        ns_window.setBackgroundColor_(NSColor.clearColor())
-        ns_window.setOpaque_(False)
-        ns_window.setHasShadow_(False)
-
-        print("PyObjC transparency applied")
+        # Get window number from tkinter
+        wid = tk_window.wm_frame()
+        # Use NSApp to find our window by iterating windows
+        app = NSApplication.sharedApplication()
+        for win in app.windows():
+            if str(win.windowNumber()) in str(wid) or True:
+                win.setBackgroundColor_(NSColor.clearColor())
+                win.setOpaque_(False)
+                win.setHasShadow_(False)
+                print(f"Applied transparency to window {win.windowNumber()}")
+                break
         return True
     except Exception as e:
-        print(f"PyObjC failed: {e}")
+        print(f"PyObjC error: {e}")
         return False
 
 
@@ -97,7 +91,8 @@ def run_picker():
     tk.Label(root, text="deskymon", font=("Helvetica", 16, "bold"),
              bg="#f5f5f5").pack(pady=(20, 4))
     tk.Label(root, text="Pick your desktop buddy",
-             font=("Helvetica", 10), fg="#666", bg="#f5f5f5").pack(pady=(0, 14))
+             font=("Helvetica", 10), fg="#666",
+             bg="#f5f5f5").pack(pady=(0, 14))
 
     chosen = tk.StringVar()
     f = tk.Frame(root, bg="#f5f5f5")
@@ -121,7 +116,7 @@ def run_picker():
 
 
 class DeskyMon:
-    BG = "#fe00fe"  # fallback bg if PyObjC unavailable
+    BG = "#fe00fe"
 
     def __init__(self, name):
         self.name = name
@@ -130,35 +125,29 @@ class DeskyMon:
         self.SW = r.winfo_screenwidth()
         self.SH = r.winfo_screenheight()
 
-        # Basic window setup
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
         r.configure(bg=self.BG)
         r.resizable(False, False)
 
-        # Hide title bar via MacWindowStyle (works without overrideredirect)
         try:
             r.tk.call("::tk::unsupported::MacWindowStyle",
                       "style", r._w, "plain", "none")
         except Exception:
             pass
 
-        # Load sprite
         self.sprite_img = fetch_sprite(name)
         self.sw, self.sh = self.sprite_img.size
         self.WIN_W = self.sw + 20
         self.WIN_H = self.sh + 36
 
-        # Sprite label — bg matches window bg (keyed transparent by PyObjC)
         self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg=self.BG)
         self.lbl.place(x=10, y=28)
 
-        # Speech bubble label
         self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
                                bg="white", relief="solid", bd=1,
                                padx=4, pady=2)
 
-        # State
         self.x  = float(self.SW - self.sw - 80)
         self.y  = float(self.SH - self.sh - 80)
         self.vx = self.vy = 0.0
@@ -172,17 +161,14 @@ class DeskyMon:
         self.mx = self.SW // 2
         self.my = self.SH // 2
 
-        # Set geometry before PyObjC call
         r.wm_geometry(f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
         r.update()
 
-        # Apply native Mac transparency — this is the key step
-        self.pyobjc_ok = make_ns_window_transparent(r)
+        # Apply transparency AFTER window is visible
+        r.after(100, lambda: make_transparent(r))
 
-        # Load images AFTER window is set up
         self._load_images()
 
-        # Right-click menu
         menu = tk.Menu(r, tearoff=0)
         menu.add_command(label="Switch Pokemon", command=self.open_picker)
         menu.add_separator()
@@ -196,11 +182,9 @@ class DeskyMon:
         r.mainloop()
 
     def _load_images(self):
-        img_r = self.sprite_img
-        img_l = self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT)
-        self.img_r = ImageTk.PhotoImage(img_r)
-        self.img_l = ImageTk.PhotoImage(img_l)
-        # Store refs on label to prevent GC
+        self.img_r = ImageTk.PhotoImage(self.sprite_img)
+        self.img_l = ImageTk.PhotoImage(
+            self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
         self.lbl.img_r = self.img_r
         self.lbl.img_l = self.img_l
 
