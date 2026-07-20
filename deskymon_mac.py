@@ -1,7 +1,7 @@
 """
 deskymon — macOS version
 Run: python3 deskymon_mac.py
-Requires: pip3 install pillow requests
+Requires: pip3 install pillow requests pyobjc-framework-Cocoa
 """
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -19,7 +19,6 @@ FOLLOW_DIST   = 160
 RUN_DIST      = 50
 DEADZONE      = 30
 SPEECH_CHANCE = 0.003
-CHROMA        = "#00fe00"   # green chroma key — keyed out by transparentcolor
 
 QUIPS = {
     "pikachu":    ["Pika!", "Pika pika!", "Pikachu!", "Pikaa~"],
@@ -52,16 +51,38 @@ def fetch_sprite(name):
         open(path, "wb").write(raw)
     img = Image.open(path).convert("RGBA")
     w, h = img.size
-    return img.resize((w * SPRITE_SCALE, h * SPRITE_SCALE), Image.NEAREST)
+    img = img.resize((w * SPRITE_SCALE, h * SPRITE_SCALE), Image.NEAREST)
+    # Clean up semi-transparent edge pixels
+    r, g, b, a = img.split()
+    a = a.point(lambda x: 0 if x < 128 else 255)
+    return Image.merge("RGBA", (r, g, b, a))
 
 
-def composite(sprite_img):
-    """Composite onto a unique bg color that will be keyed out by the window."""
-    # Use a very specific purple that won't appear in any Pokemon sprite
-    KEY = (254, 0, 254, 255)
-    bg = Image.new("RGBA", sprite_img.size, KEY)
-    bg.paste(sprite_img, mask=sprite_img.split()[3])
-    return bg.convert("RGB")
+def make_ns_window_transparent(tk_window):
+    """Use PyObjC to make the underlying NSWindow fully transparent."""
+    try:
+        from AppKit import NSApp, NSColor
+        from Foundation import NSObject
+        import objc
+
+        # Force the window to render so we can get its handle
+        tk_window.update()
+
+        # Get NSWindow from the tkinter window ID
+        win_id = tk_window.winfo_id()
+        ns_view = objc.objc_object(c_void_p=win_id)
+        ns_window = ns_view.window()
+
+        # Make fully transparent
+        ns_window.setBackgroundColor_(NSColor.clearColor())
+        ns_window.setOpaque_(False)
+        ns_window.setHasShadow_(False)
+
+        print("PyObjC transparency applied")
+        return True
+    except Exception as e:
+        print(f"PyObjC failed: {e}")
+        return False
 
 
 def run_picker():
@@ -73,20 +94,26 @@ def run_picker():
     root.focus_force()
     root.attributes("-topmost", True)
 
-    tk.Label(root, text="deskymon", font=("Helvetica", 16, "bold"), bg="#f5f5f5").pack(pady=(20,4))
-    tk.Label(root, text="Pick your desktop buddy", font=("Helvetica",10), fg="#666", bg="#f5f5f5").pack(pady=(0,14))
+    tk.Label(root, text="deskymon", font=("Helvetica", 16, "bold"),
+             bg="#f5f5f5").pack(pady=(20, 4))
+    tk.Label(root, text="Pick your desktop buddy",
+             font=("Helvetica", 10), fg="#666", bg="#f5f5f5").pack(pady=(0, 14))
 
     chosen = tk.StringVar()
     f = tk.Frame(root, bg="#f5f5f5")
-    f.pack(padx=24, pady=(0,20))
+    f.pack(padx=24, pady=(0, 20))
 
     def pick(n):
-        chosen.set(n); root.destroy()
+        chosen.set(n)
+        root.destroy()
 
     for i, n in enumerate(POKEMON_LIST):
-        tk.Button(f, text=n.capitalize(), width=11, command=lambda n=n: pick(n),
-                  relief="groove", bg="white", activebackground="#e8f4ff",
-                  font=("Helvetica", 10)).grid(row=i//4, column=i%4, padx=6, pady=5)
+        tk.Button(f, text=n.capitalize(), width=11,
+                  command=lambda n=n: pick(n),
+                  relief="groove", bg="white",
+                  activebackground="#e8f4ff",
+                  font=("Helvetica", 10)).grid(
+            row=i // 4, column=i % 4, padx=6, pady=5)
 
     root.protocol("WM_DELETE_WINDOW", root.destroy)
     root.mainloop()
@@ -94,6 +121,8 @@ def run_picker():
 
 
 class DeskyMon:
+    BG = "#fe00fe"  # fallback bg if PyObjC unavailable
+
     def __init__(self, name):
         self.name = name
         self.root = r = tk.Tk()
@@ -101,34 +130,35 @@ class DeskyMon:
         self.SW = r.winfo_screenwidth()
         self.SH = r.winfo_screenheight()
 
-        BGCOL = "#fe00fe"  # magic purple — keyed transparent
+        # Basic window setup
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.configure(bg=BGCOL)
-        # Tell the Mac compositor to key out this exact color
-        r.update()
-        r.tk.call("wm", "attributes", r._w, "-transparentcolor", BGCOL)
+        r.configure(bg=self.BG)
         r.resizable(False, False)
 
-        # Hide title bar — works on macOS without overrideredirect
+        # Hide title bar via MacWindowStyle (works without overrideredirect)
         try:
-            r.tk.call("::tk::unsupported::MacWindowStyle", "style", r._w, "plain", "none")
+            r.tk.call("::tk::unsupported::MacWindowStyle",
+                      "style", r._w, "plain", "none")
         except Exception:
             pass
 
+        # Load sprite
         self.sprite_img = fetch_sprite(name)
         self.sw, self.sh = self.sprite_img.size
         self.WIN_W = self.sw + 20
         self.WIN_H = self.sh + 36
 
-        # Single label — composite sprite onto chroma bg, window keys it out
-        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg="#fe00fe")
-        self.lbl.pack(pady=(26, 0), padx=10, anchor="w")
+        # Sprite label — bg matches window bg (keyed transparent by PyObjC)
+        self.lbl = tk.Label(r, bd=0, highlightthickness=0, bg=self.BG)
+        self.lbl.place(x=10, y=28)
 
-        # Speech bubble
-        self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222",
-                               bg="white", relief="solid", bd=1, padx=4, pady=2)
+        # Speech bubble label
+        self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
+                               bg="white", relief="solid", bd=1,
+                               padx=4, pady=2)
 
+        # State
         self.x  = float(self.SW - self.sw - 80)
         self.y  = float(self.SH - self.sh - 80)
         self.vx = self.vy = 0.0
@@ -142,26 +172,35 @@ class DeskyMon:
         self.mx = self.SW // 2
         self.my = self.SH // 2
 
+        # Set geometry before PyObjC call
+        r.wm_geometry(f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
+        r.update()
+
+        # Apply native Mac transparency — this is the key step
+        self.pyobjc_ok = make_ns_window_transparent(r)
+
+        # Load images AFTER window is set up
         self._load_images()
 
+        # Right-click menu
         menu = tk.Menu(r, tearoff=0)
-        menu.add_command(label="Switch Pokémon", command=self.open_picker)
+        menu.add_command(label="Switch Pokemon", command=self.open_picker)
         menu.add_separator()
         menu.add_command(label="Quit", command=r.destroy)
         self.lbl.bind("<Button-2>",         lambda e: menu.tk_popup(e.x_root, e.y_root))
         self.lbl.bind("<Control-Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
         self.lbl.bind("<Button-1>",         lambda e: self._poke())
 
-        r.wm_geometry(f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
         self._poll_cursor()
         self._loop()
         r.mainloop()
 
     def _load_images(self):
-        img_r = composite(self.sprite_img)
-        img_l = composite(self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT))
+        img_r = self.sprite_img
+        img_l = self.sprite_img.transpose(Image.FLIP_LEFT_RIGHT)
         self.img_r = ImageTk.PhotoImage(img_r)
         self.img_l = ImageTk.PhotoImage(img_l)
+        # Store refs on label to prevent GC
         self.lbl.img_r = self.img_r
         self.lbl.img_l = self.img_l
 
@@ -256,20 +295,26 @@ class DeskyMon:
 
     def open_picker(self):
         picker = tk.Toplevel(self.root)
-        picker.title("Switch Pokémon")
+        picker.title("Switch Pokemon")
         picker.configure(bg="#f5f5f5")
         picker.resizable(False, False)
-        picker.lift(); picker.focus_force()
+        picker.lift()
+        picker.focus_force()
         tk.Label(picker, text="Who's your buddy?",
-                 font=("Helvetica", 13, "bold"), bg="#f5f5f5").pack(pady=(16,8))
+                 font=("Helvetica", 13, "bold"),
+                 bg="#f5f5f5").pack(pady=(16, 8))
         f = tk.Frame(picker, bg="#f5f5f5")
-        f.pack(padx=20, pady=(0,16))
+        f.pack(padx=20, pady=(0, 16))
+
         def pick(n):
-            picker.destroy(); self.switch(n)
+            picker.destroy()
+            self.switch(n)
+
         for i, n in enumerate(POKEMON_LIST):
             tk.Button(f, text=n.capitalize(), width=10,
-                command=lambda n=n: pick(n),
-                relief="groove", bg="white").grid(row=i//4, column=i%4, padx=6, pady=4)
+                      command=lambda n=n: pick(n),
+                      relief="groove", bg="white").grid(
+                row=i // 4, column=i % 4, padx=6, pady=4)
 
     def switch(self, name):
         self.name       = name
