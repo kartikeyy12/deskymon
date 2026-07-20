@@ -57,35 +57,7 @@ def fetch_sprite(name):
     return Image.merge("RGBA", (r, g, b, a))
 
 
-def make_transparent(tk_window):
-    """Make NSWindow transparent and key out the magic color via Cocoa."""
-    try:
-        from AppKit import NSApplication, NSColor
-        tk_window.update()
-        app = NSApplication.sharedApplication()
-        wins = app.windows()
-        if not wins:
-            print("No windows found")
-            return False
-        # The most recently created window is ours
-        win = wins[-1]
-        # Set clear background — removes window bg entirely
-        win.setBackgroundColor_(NSColor.clearColor())
-        win.setOpaque_(False)
-        win.setHasShadow_(False)
-        # Make content view layer-backed and fully transparent
-        content_view = win.contentView()
-        content_view.setWantsLayer_(True)
-        content_view.layer().setOpacity_(1.0)
-        # Set the window background to a CGColor with 0 alpha
-        from AppKit import NSColor
-        win.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(
-            254/255.0, 0/255.0, 254/255.0, 0.0))
-        print(f"Applied transparency to window {win.windowNumber()}")
-        return True
-    except Exception as e:
-        print(f"PyObjC error: {e}")
-        return False
+
 
 
 def run_picker():
@@ -125,7 +97,7 @@ def run_picker():
 
 
 class DeskyMon:
-    BG = "#fe00fe"
+    BG = "#1a1a1a"
 
     def __init__(self, name):
         self.name = name
@@ -135,8 +107,7 @@ class DeskyMon:
         self.SH = r.winfo_screenheight()
 
         r.wm_attributes("-topmost", True)
-        r.wm_attributes("-transparent", True)
-        r.configure(bg="#fe00fe")
+        r.configure(bg="#1a1a1a")
         r.resizable(False, False)
 
         try:
@@ -151,7 +122,7 @@ class DeskyMon:
         self.WIN_H = self.sh + 36
 
         self.canvas = tk.Canvas(r, width=self.WIN_W, height=self.WIN_H,
-                                bg="#fe00fe", highlightthickness=0)
+                                bg="#1a1a1a", highlightthickness=0)
         self.canvas.place(x=0, y=0)
 
         self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
@@ -174,8 +145,6 @@ class DeskyMon:
         r.wm_geometry(f"{self.WIN_W}x{self.WIN_H}+{int(self.x)}+{int(self.y)}")
         r.update()
 
-        # Apply transparency AFTER window is visible
-        r.after(100, lambda: make_transparent(r))
 
         self._load_images()
 
