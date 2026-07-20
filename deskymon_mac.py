@@ -127,7 +127,7 @@ class DeskyMon:
 
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.configure(bg=self.BG)
+        r.configure(bg="systemTransparent")
         r.resizable(False, False)
 
         try:
