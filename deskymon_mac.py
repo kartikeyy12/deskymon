@@ -58,21 +58,27 @@ def fetch_sprite(name):
 
 
 def make_transparent(tk_window):
-    """Make NSWindow transparent using safe PyObjC API."""
+    """Make NSWindow transparent and key out the magic color via Cocoa."""
     try:
-        from AppKit import NSApplication, NSColor, NSWindow
+        from AppKit import NSApplication, NSColor
         tk_window.update()
-        # Get window number from tkinter
-        wid = tk_window.wm_frame()
-        # Use NSApp to find our window by iterating windows
         app = NSApplication.sharedApplication()
-        for win in app.windows():
-            if str(win.windowNumber()) in str(wid) or True:
-                win.setBackgroundColor_(NSColor.clearColor())
-                win.setOpaque_(False)
-                win.setHasShadow_(False)
-                print(f"Applied transparency to window {win.windowNumber()}")
-                break
+        wins = app.windows()
+        if not wins:
+            print("No windows found")
+            return False
+        # The most recently created window is ours
+        win = wins[-1]
+        # Set clear background — removes window bg entirely
+        win.setBackgroundColor_(NSColor.clearColor())
+        win.setOpaque_(False)
+        win.setHasShadow_(False)
+        # Key out our magic pink color using NSColor colorWithDeviceRed
+        # This is the Cocoa equivalent of -transparentcolor
+        pink = NSColor.colorWithDeviceRed_green_blue_alpha_(
+            254/255.0, 0/255.0, 254/255.0, 1.0)
+        win.setColorKey_(pink)
+        print(f"Applied transparency + colorKey to window {win.windowNumber()}")
         return True
     except Exception as e:
         print(f"PyObjC error: {e}")
@@ -127,7 +133,7 @@ class DeskyMon:
 
         r.wm_attributes("-topmost", True)
         r.wm_attributes("-transparent", True)
-        r.configure(bg="systemTransparent")
+        r.configure(bg="#fe00fe")
         r.resizable(False, False)
 
         try:
@@ -142,7 +148,7 @@ class DeskyMon:
         self.WIN_H = self.sh + 36
 
         self.canvas = tk.Canvas(r, width=self.WIN_W, height=self.WIN_H,
-                                bg="systemTransparent", highlightthickness=0)
+                                bg="#fe00fe", highlightthickness=0)
         self.canvas.place(x=0, y=0)
 
         self.bubble = tk.Label(r, font=("Helvetica", 9), fg="#222222",
